@@ -39,6 +39,17 @@ module ddr5_refresh_ctrl #(
     logic [3:0]  credit_r;
     logic [4:0]  bank_ptr;  // Round-robin bank pointer for REFsb
 
+    // Credit increment per refresh interval depends on the FGR mode
+    logic [3:0] credit_inc;
+    always_comb begin
+        case (fgr_mode)
+            2'b00:   credit_inc = 4'd1;  // 1x
+            2'b01:   credit_inc = 4'd2;  // 2x
+            2'b10:   credit_inc = 4'd4;  // 4x
+            default: credit_inc = 4'd1;
+        endcase
+    end
+
     // tREFI countdown and credit accumulation (unified block)
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -50,19 +61,20 @@ module ddr5_refresh_ctrl #(
             if (trefi_cnt > 0) trefi_cnt <= trefi_cnt - 16'd1;
 
             // Auto-refresh: accumulate credit on tREFI expiry
+            // Credits saturate at MAX_CREDITS (8); extra refresh requests are
+            // dropped and reported through `overflow`.
             if (auto_ref_en && trefi_cnt == 0) begin
                 trefi_cnt <= tREFI;
-                case (fgr_mode)
-                    2'b00: credit_r <= credit_r + 4'd1;  // 1x
-                    2'b01: credit_r <= credit_r + 4'd2;  // 2x
-                    2'b10: credit_r <= credit_r + 4'd4;  // 4x
-                    default: credit_r <= credit_r + 4'd1;
-                endcase
+                if (credit_r + credit_inc > 4'd8) begin
+                    credit_r <= 4'd8;
+                end else begin
+                    credit_r <= credit_r + credit_inc;
+                end
                 bank_ptr <= bank_ptr + 5'd1;
             end
 
-            // Manual trigger
-            if (manual_trigger) begin
+            // Manual trigger (saturating as well)
+            if (manual_trigger && credit_r < 4'd8) begin
                 credit_r <= credit_r + 4'd1;
             end
 

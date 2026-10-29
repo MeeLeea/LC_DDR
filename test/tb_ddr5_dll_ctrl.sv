@@ -45,6 +45,7 @@ module tb_ddr5_dll_ctrl();
     int fail_count = 0;
     // hoisted out of the initial block (AGENT.md rule #8 / Xsim HDL 9-1206)
     logic [DLL_BITS-1:0] code_before;
+    logic [DLL_BITS-1:0] code_after;
 
     task automatic wait_cycles(int n);
         repeat(n) @(posedge clk);
@@ -103,9 +104,9 @@ module tb_ddr5_dll_ctrl();
         @(posedge clk);
         dll_en = 1;
         wait_cycles(5);
-        // After enable, FSM should be in COARSE and delay_code initialized near midpoint
-        if (dll_state !== 4'h0 && dll_delay_code >= 8'h40 && dll_delay_code <= 8'hC0) begin
-            $display("[PASS] Test %0d: DLL started (state=%0h, code=0x%02h)", test_num, dll_state, dll_delay_code);
+        // After enable, FSM should leave IDLE (state 0) and delay_code initialized near midpoint
+        if (dut.state !== 3'd0 && dll_delay_code >= 8'h40 && dll_delay_code <= 8'hC0) begin
+            $display("[PASS] Test %0d: DLL started (state=%0h, code=0x%02h)", test_num, dut.state, dll_delay_code);
             pass_count++;
         end else begin
             $display("[FAIL] Test %0d: DLL not started correctly", test_num);
@@ -130,15 +131,26 @@ module tb_ddr5_dll_ctrl();
         // ---- Test 4: Coarse search with phase_late ----
         test_num = 4;
         $display("\n--- Test %0d: Coarse search (phase_late) ---", test_num);
+        // Test 3 already consumed the 7 coarse steps, so restart the DLL to
+        // re-enter DLL_COARSE from the midpoint code (0x80)
+        dll_reset = 1;
+        wait_cycles(2);
+        dll_reset = 0;
+        // wait until the FSM re-enters DLL_COARSE (delay_code just reloaded to 0x80)
+        wait (dut.state === 3'd1);
+        #1;
         code_before = dll_delay_code;
-        simulate_phase_late();
-        wait_cycles(20);
-        if (dll_delay_code < code_before) begin
-            $display("[PASS] Test %0d: Delay code decreased (0x%02h → 0x%02h)", 
-                     test_num, code_before, dll_delay_code);
+        phase_late = 1;          // one coarse step with "late" phase must subtract
+        @(posedge clk);
+        #1 code_after = dll_delay_code;
+        phase_late = 0;
+        if (code_after < code_before) begin
+            $display("[PASS] Test %0d: Delay code decreased (0x%02h -> 0x%02h)",
+                     test_num, code_before, code_after);
             pass_count++;
         end else begin
-            $display("[FAIL] Test %0d: Delay code did not decrease", test_num);
+            $display("[FAIL] Test %0d: Delay code did not decrease (0x%02h -> 0x%02h)",
+                     test_num, code_before, code_after);
             fail_count++;
         end
 
@@ -210,15 +222,17 @@ module tb_ddr5_dll_ctrl();
         @(posedge clk);
         dll_reset = 1;
         wait_cycles(30);
-        dll_reset = 0;
-        wait_cycles(5);
+        // Check while dll_reset is still asserted: the DLL must be held idle
+        // (releasing dll_reset with dll_en=1 legally restarts the search)
         if (dll_locked === 0 && dll_delay_code === 0 && dll_lock_fail === 0) begin
             $display("[PASS] Test %0d: DLL reset correctly", test_num);
             pass_count++;
         end else begin
-            $display("[FAIL] Test %0d: DLL reset failed", test_num);
+            $display("[FAIL] Test %0d: DLL reset failed (locked=%0b code=0x%02h fail=%0b)",
+                     test_num, dll_locked, dll_delay_code, dll_lock_fail);
             fail_count++;
         end
+        dll_reset = 0;
 
         // Summary
         $display("\n========================================");

@@ -20,6 +20,13 @@ module tb_ddr5_clk_gate();
         .clk_out(clk_out)
     );
 
+    // Functional coverage collector (test/ddr5_covergroups.sv), driven hierarchically
+    ddr5_coverage_collector u_cov ();
+    assign u_cov.clk_in  = clk_in;
+    assign u_cov.en      = en;
+    assign u_cov.test_en = test_en;
+    assign u_cov.clk_out = clk_out;
+
     // Clock generation
     parameter real CLK_PERIOD = 5.0;  // 200 MHz
     initial begin

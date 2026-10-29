@@ -220,7 +220,11 @@ module ddr5_cmd_scheduler #(
             cmd_out_valid   = 1'b1;
             cmd_out_id      = queue[winner_idx].id;
             cmd_out_bank    = dec_bank[winner_idx];
-            cmd_out_bg      = dec_bg[winner_idx];
+            // dec_bank folds the bank group to 2 bits ({dec_bg[1:0], dec_ba});
+            // cmd_out_bg must match that folding, otherwise the timing engine
+            // indexes bg_tCCD_cnt/bg_tRRD_cnt[4..7] (out of bounds -> X) and
+            // the FSM hangs in ST_WAIT_TIM.
+            cmd_out_bg      = {1'b0, dec_bg[winner_idx][1:0]};
             cmd_out_ba      = dec_ba[winner_idx];
             cmd_out_row     = dec_row[winner_idx];
             cmd_out_col     = dec_col[winner_idx];

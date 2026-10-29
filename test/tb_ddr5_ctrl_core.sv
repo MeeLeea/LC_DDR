@@ -68,6 +68,16 @@ module tb_ddr5_ctrl_core();
     // Clear strobes: set by initial block, consumed by always_ff
     logic pulse_clr_act, pulse_clr_rd, pulse_clr_wr;
 
+    // Test 6: sticky "refresh credit was ever accumulated" flag.
+    // Refresh has top scheduling priority, so credits are consumed within a few
+    // cycles of each tREFI expiry; a single instantaneous sample at the end of
+    // the window would almost always read 0.
+    logic refresh_credit_seen;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) refresh_credit_seen <= 1'b0;
+        else if (refresh_credit > 0 || refresh_overflow) refresh_credit_seen <= 1'b1;
+    end
+
     ddr5_ctrl_core #(
         .NUM_BANKS(NUM_BANKS),
         .QUEUE_DEPTH(QUEUE_DEPTH)
@@ -290,7 +300,7 @@ module tb_ddr5_ctrl_core();
         // After 2 tREFI periods (~18750 cycles), check credit was ever non-zero
         // Actually just check that credit_count or overflow is non-zero at some point
         wait_cycles(30000);
-        if (refresh_credit > 0 || refresh_overflow) begin
+        if (refresh_credit_seen) begin
             $display("[PASS] Test %0d: Refresh credits accumulated (credit=%0d, overflow=%0d)", 
                      test_num, refresh_credit, refresh_overflow);
             pass_count++;

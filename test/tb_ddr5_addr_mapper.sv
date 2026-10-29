@@ -42,6 +42,16 @@ module tb_ddr5_addr_mapper();
         .map_mode(map_mode)
     );
 
+    // Functional coverage collector (test/ddr5_covergroups.sv), driven hierarchically
+    ddr5_coverage_collector u_cov ();
+    assign u_cov.clk         = clk;
+    assign u_cov.bg_addr     = bg_addr;
+    assign u_cov.bank_addr   = bank_addr;
+    assign u_cov.rank_addr   = rank_addr;
+    assign u_cov.row_addr    = row_addr;
+    assign u_cov.col_addr    = col_addr;
+    assign u_cov.sub_channel = sub_channel;
+
     // Clock generation
     initial begin
         clk = 0;

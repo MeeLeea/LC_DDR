@@ -30,6 +30,13 @@ module tb_ddr5_reset_sync();
         forever #(CLK_PERIOD/2) clk = ~clk;
     end
 
+    // Functional coverage collector (declared in test/ddr5_covergroups.sv).
+    // Its sampling signals are driven hierarchically from this tb.
+    ddr5_coverage_collector u_cov ();
+    assign u_cov.clk         = clk;
+    assign u_cov.async_rst_n = async_rst_n;
+    assign u_cov.sync_rst_n  = sync_rst_n;
+
     // Test variables
     int test_num = 0;
     int pass_count = 0;

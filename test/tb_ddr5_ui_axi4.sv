@@ -135,6 +135,67 @@ module tb_ddr5_ui_axi4();
     initial begin cclk = 0; forever #(CCLK_PERIOD/2) cclk = ~cclk; end
 
     // =========================================================================
+    // Functional coverage collector (test/ddr5_covergroups.sv).
+    // The collector exposes its sampling points as internal signals, they are
+    // driven hierarchically here from the AXI4 interface and DUT internals.
+    // =========================================================================
+    ddr5_coverage_collector u_cov ();
+
+    // gray -> binary (CDC FIFO write pointer synchronizer) to get the occupancy
+    function automatic logic [4:0] gray2bin5(input logic [4:0] g);
+        logic [4:0] b;
+        b[4] = g[4];
+        b[3] = b[4] ^ g[3];
+        b[2] = b[3] ^ g[2];
+        b[1] = b[2] ^ g[1];
+        b[0] = b[1] ^ g[0];
+        return b;
+    endfunction
+
+    logic [4:0] cov_fifo_occ;
+    assign cov_fifo_occ = dut.u_cmd_fifo.wr_ptr_bin[4:0]
+                        - gray2bin5(dut.u_cmd_fifo.rd_ptr_gray_sync_wr[4:0]);
+
+    assign u_cov.clk          = uclk;
+    assign u_cov.wr_clk       = uclk;
+
+    // AXI4 write/read channel (port 0 is the port exercised by this tb)
+    assign u_cov.awlen        = s_axi_awlen[7:0];
+    assign u_cov.awsize       = s_axi_awsize[2:0];
+    assign u_cov.awid         = s_axi_awid[7:0];
+    assign u_cov.awqos        = s_axi_awqos[3:0];
+    assign u_cov.awvalid      = s_axi_awvalid[0];
+    assign u_cov.awready      = s_axi_awready[0];
+    assign u_cov.arlen        = s_axi_arlen[7:0];
+    assign u_cov.arsize       = s_axi_arsize[2:0];
+    assign u_cov.arid         = s_axi_arid[7:0];
+    assign u_cov.arqos        = s_axi_arqos[3:0];
+
+    // Arbitrated command stream
+    assign u_cov.out_port_id  = dut.arb_port;
+    assign u_cov.out_is_write = dut.arb_is_write;
+    assign u_cov.out_qos      = dut.arb_qos;
+
+    // Address decoder
+    assign u_cov.bg_addr      = dut.map_bg;
+    assign u_cov.bank_addr    = dut.map_ba;
+    assign u_cov.rank_addr    = dut.map_rank;
+    assign u_cov.row_addr     = dut.map_row[15:0];
+    assign u_cov.col_addr     = dut.map_col[8:0];
+    assign u_cov.sub_channel  = dut.map_sub_ch;
+
+    // Command CDC FIFO
+    assign u_cov.wr_count     = cov_fifo_occ;
+    assign u_cov.wr_full      = dut.cmd_fifo_full;
+
+    // Exclusive access / responses
+    assign u_cov.awlock       = s_axi_awlock[0];
+    assign u_cov.arlock       = s_axi_arlock[0];
+    assign u_cov.res_valid    = dut.mon_res_valid[0];
+    assign u_cov.bresp        = s_axi_bresp[1:0];
+    assign u_cov.rresp        = s_axi_rresp[1:0];
+
+    // =========================================================================
     // Test infrastructure
     // =========================================================================
     int test_num   = 0;

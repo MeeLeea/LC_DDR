@@ -145,15 +145,18 @@ module ddr5_protocol_fsm #(
                     ref_ack    = 1'b1;
                 end else if (cmd_valid) begin
                     // Check timing and bank status
-                    timing_check_req = 1'b1;
-                    bank_mgr_valid   = 1'b1;
-                    state_next       = ST_WAIT_TIM;
+                    bank_mgr_valid = 1'b1;
+                    state_next     = ST_WAIT_TIM;
                 end
             end
 
+            // Note: timing_check_req must only pulse in the DFI issue states
+            // (ST_ACT/ST_RD/ST_WR/ST_PRE). The timing engine loads its countdown
+            // timers on cmd_valid; asserting it while waiting in ST_WAIT_TIM
+            // would reload the very timers (tCCD/tRCD/tRC) the pending command
+            // is waiting on, deadlocking the FSM.
             ST_WAIT_TIM: begin
-                timing_check_req = 1'b1;
-                bank_mgr_valid   = 1'b1;
+                bank_mgr_valid = 1'b1;
                 if (timing_check_ok) begin
                     // Issue command based on type
                     case (cmd_type_r)
@@ -167,6 +170,7 @@ module ddr5_protocol_fsm #(
             end
 
             ST_ACT: begin
+                timing_check_req = 1'b1;  // load tRCD/tRAS/tRC on issue
                 dfi_cmd_valid = 1'b1;
                 dfi_address   = cmd_row_r;
                 dfi_act_n     = 1'b0;
@@ -175,6 +179,7 @@ module ddr5_protocol_fsm #(
             end
 
             ST_RD: begin
+                timing_check_req = 1'b1;  // load tCCD/tRTP on issue
                 dfi_cmd_valid = 1'b1;
                 dfi_address   = {8'h00, cmd_col_r};
                 dfi_cas_n     = 1'b0;
@@ -182,6 +187,7 @@ module ddr5_protocol_fsm #(
             end
 
             ST_WR: begin
+                timing_check_req = 1'b1;  // load tCCD/tWR on issue
                 dfi_cmd_valid = 1'b1;
                 dfi_address   = {8'h00, cmd_col_r};
                 dfi_cas_n     = 1'b0;
@@ -190,6 +196,7 @@ module ddr5_protocol_fsm #(
             end
 
             ST_PRE: begin
+                timing_check_req = 1'b1;  // load tRP on issue
                 dfi_cmd_valid = 1'b1;
                 dfi_ras_n     = 1'b0;
                 dfi_we_n      = 1'b0;

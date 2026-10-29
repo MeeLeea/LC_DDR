@@ -79,6 +79,196 @@ module tb_ddr5_ui_top();
     logic [9:0] ddr5_col;
     logic [1:0] ddr5_rank;
 
+    // Controller-side write data channel (write data sink is always ready here)
+    logic wr_data_ready;
+    logic [1:0] addr_map_mode;
+
+    // ---------------------------------------------------------------------
+    // DUT interconnect: the DUT uses flattened AXI4 vectors, this tb uses
+    // unpacked per-port arrays, so bridge them explicitly
+    // ---------------------------------------------------------------------
+    logic [NUM_PORTS*ID_W-1:0]   f_awid;
+    logic [NUM_PORTS*ADDR_W-1:0] f_awaddr;
+    logic [NUM_PORTS*8-1:0]      f_awlen;
+    logic [NUM_PORTS*3-1:0]      f_awsize;
+    logic [NUM_PORTS*2-1:0]      f_awburst;
+    logic [NUM_PORTS*4-1:0]      f_awcache;
+    logic [NUM_PORTS*3-1:0]      f_awprot;
+    logic [NUM_PORTS*4-1:0]      f_awqos;
+    logic [NUM_PORTS-1:0]        f_awvalid;
+    logic [NUM_PORTS*DATA_W-1:0] f_wdata;
+    logic [NUM_PORTS*STRB_W-1:0] f_wstrb;
+    logic [NUM_PORTS-1:0]        f_wlast;
+    logic [NUM_PORTS-1:0]        f_wvalid;
+    logic [NUM_PORTS-1:0]        f_bready;
+    logic [NUM_PORTS*ID_W-1:0]   f_arid;
+    logic [NUM_PORTS*ADDR_W-1:0] f_araddr;
+    logic [NUM_PORTS*8-1:0]      f_arlen;
+    logic [NUM_PORTS*3-1:0]      f_arsize;
+    logic [NUM_PORTS*2-1:0]      f_arburst;
+    logic [NUM_PORTS*4-1:0]      f_arcache;
+    logic [NUM_PORTS*3-1:0]      f_arprot;
+    logic [NUM_PORTS*4-1:0]      f_arqos;
+    logic [NUM_PORTS-1:0]        f_arvalid;
+    logic [NUM_PORTS-1:0]        f_awlock;
+    logic [NUM_PORTS-1:0]        f_arlock;
+    logic [NUM_PORTS-1:0]        f_rready;
+
+    logic [NUM_PORTS-1:0]        d_awready;
+    logic [NUM_PORTS-1:0]        d_wready;
+    logic [NUM_PORTS*ID_W-1:0]   d_bid;
+    logic [NUM_PORTS*2-1:0]      d_bresp;
+    logic [NUM_PORTS-1:0]        d_bvalid;
+    logic [NUM_PORTS-1:0]        d_arready;
+    logic [NUM_PORTS*ID_W-1:0]   d_rid;
+    logic [NUM_PORTS*DATA_W-1:0] d_rdata;
+    logic [NUM_PORTS*2-1:0]      d_rresp;
+    logic [NUM_PORTS-1:0]        d_rlast;
+    logic [NUM_PORTS-1:0]        d_rvalid;
+
+    genvar gp;
+    generate
+        for (gp = 0; gp < NUM_PORTS; gp++) begin : g_axi_flat
+            assign f_awid[gp*ID_W+:ID_W]           = s_axi_awid[gp];
+            assign f_awaddr[gp*ADDR_W+:ADDR_W]     = s_axi_awaddr[gp];
+            assign f_awlen[gp*8+:8]                = s_axi_awlen[gp];
+            assign f_awsize[gp*3+:3]               = s_axi_awsize[gp];
+            assign f_awburst[gp*2+:2]              = s_axi_awburst[gp];
+            assign f_awcache[gp*4+:4]              = s_axi_awcache[gp];
+            assign f_awprot[gp*3+:3]               = s_axi_awprot[gp];
+            assign f_awqos[gp*4+:4]                = s_axi_awqos[gp];
+            assign f_awvalid[gp]                   = s_axi_awvalid[gp];
+            assign f_awlock[gp]                    = 1'b0;
+            assign f_wdata[gp*DATA_W+:DATA_W]      = s_axi_wdata[gp];
+            assign f_wstrb[gp*STRB_W+:STRB_W]      = s_axi_wstrb[gp];
+            assign f_wlast[gp]                     = s_axi_wlast[gp];
+            assign f_wvalid[gp]                    = s_axi_wvalid[gp];
+            assign f_bready[gp]                    = s_axi_bready[gp];
+            assign f_arid[gp*ID_W+:ID_W]           = s_axi_arid[gp];
+            assign f_araddr[gp*ADDR_W+:ADDR_W]     = s_axi_araddr[gp];
+            assign f_arlen[gp*8+:8]                = s_axi_arlen[gp];
+            assign f_arsize[gp*3+:3]               = s_axi_arsize[gp];
+            assign f_arburst[gp*2+:2]              = s_axi_arburst[gp];
+            assign f_arcache[gp*4+:4]              = s_axi_arcache[gp];
+            assign f_arprot[gp*3+:3]               = s_axi_arprot[gp];
+            assign f_arqos[gp*4+:4]                = s_axi_arqos[gp];
+            assign f_arvalid[gp]                   = s_axi_arvalid[gp];
+            assign f_arlock[gp]                    = 1'b0;
+            assign f_rready[gp]                    = s_axi_rready[gp];
+
+            assign s_axi_awready[gp]               = d_awready[gp];
+            assign s_axi_wready[gp]                = d_wready[gp];
+            assign s_axi_bid[gp]                   = d_bid[gp*ID_W+:ID_W];
+            assign s_axi_bresp[gp]                 = d_bresp[gp*2+:2];
+            assign s_axi_bvalid[gp]                = d_bvalid[gp];
+            assign s_axi_arready[gp]               = d_arready[gp];
+            assign s_axi_rid[gp]                   = d_rid[gp*ID_W+:ID_W];
+            assign s_axi_rdata[gp]                 = d_rdata[gp*DATA_W+:DATA_W];
+            assign s_axi_rresp[gp]                 = d_rresp[gp*2+:2];
+            assign s_axi_rlast[gp]                 = d_rlast[gp];
+            assign s_axi_rvalid[gp]                = d_rvalid[gp];
+        end
+    endgenerate
+
+    // DUT (user interface layer: 4x AXI4 slave + arbiter + addr mapper + cmd CDC)
+    ddr5_ui_axi4 #(
+        .NUM_PORTS (NUM_PORTS),
+        .ID_W      (ID_W),
+        .ADDR_W    (ADDR_W),
+        .DATA_W    (DATA_W),
+        .STRB_W    (STRB_W)
+    ) dut (
+        .uclk            (user_clk),
+        .uclk_rst_n      (por_rst_n),
+        .cclk            (ctrl_clk),
+        .cclk_rst_n      (por_rst_n),
+
+        .s_axi_awid      (f_awid),
+        .s_axi_awaddr    (f_awaddr),
+        .s_axi_awlen     (f_awlen),
+        .s_axi_awsize    (f_awsize),
+        .s_axi_awburst   (f_awburst),
+        .s_axi_awcache   (f_awcache),
+        .s_axi_awprot    (f_awprot),
+        .s_axi_awqos     (f_awqos),
+        .s_axi_awlock    (f_awlock),
+        .s_axi_awvalid   (f_awvalid),
+        .s_axi_awready   (d_awready),
+        .s_axi_wdata     (f_wdata),
+        .s_axi_wstrb     (f_wstrb),
+        .s_axi_wlast     (f_wlast),
+        .s_axi_wvalid    (f_wvalid),
+        .s_axi_wready    (d_wready),
+        .s_axi_bid       (d_bid),
+        .s_axi_bresp     (d_bresp),
+        .s_axi_bvalid    (d_bvalid),
+        .s_axi_bready    (f_bready),
+        .s_axi_arid      (f_arid),
+        .s_axi_araddr    (f_araddr),
+        .s_axi_arlen     (f_arlen),
+        .s_axi_arsize    (f_arsize),
+        .s_axi_arburst   (f_arburst),
+        .s_axi_arcache   (f_arcache),
+        .s_axi_arprot    (f_arprot),
+        .s_axi_arqos     (f_arqos),
+        .s_axi_arlock    (f_arlock),
+        .s_axi_arvalid   (f_arvalid),
+        .s_axi_arready   (d_arready),
+        .s_axi_rid       (d_rid),
+        .s_axi_rdata     (d_rdata),
+        .s_axi_rresp     (d_rresp),
+        .s_axi_rlast     (d_rlast),
+        .s_axi_rvalid    (d_rvalid),
+        .s_axi_rready    (f_rready),
+
+        .cmd_valid       (cmd_valid),
+        .cmd_ready       (cmd_ready),
+        .cmd_is_write    (cmd_is_write),
+        .cmd_id          (cmd_id),
+        .cmd_addr        (cmd_addr),
+        .cmd_len         (cmd_len),
+        .cmd_port_id     (cmd_port_id),
+        .cmd_qos         (cmd_qos),
+
+        .wr_data_valid   (),
+        .wr_data_ready   (wr_data_ready),
+        .wr_data         (),
+        .wr_strb         (),
+        .wr_last         (),
+
+        .rd_data         ({DATA_W{1'b0}}),
+        .rd_data_valid   (1'b0),
+        .rd_data_ready   (),
+        .rd_port_id      (2'd0),
+        .rd_id           (8'd0),
+
+        .addr_map_mode   (addr_map_mode)
+    );
+
+    // ---------------------------------------------------------------------
+    // Command monitor (cclk domain): latch the first command accepted by the
+    // controller side, because cmd_valid is a one-cycle pulse on the CDC
+    // FIFO output and is already gone when the AXI write response returns.
+    // ---------------------------------------------------------------------
+    logic        mon_cmd_seen;
+    logic        mon_cmd_is_wr;
+    logic [1:0]  mon_cmd_port;
+    logic [ADDR_W-1:0] mon_cmd_addr;
+
+    always_ff @(posedge ctrl_clk or negedge por_rst_n) begin
+        if (!por_rst_n) begin
+            mon_cmd_seen  <= 1'b0;
+            mon_cmd_is_wr <= 1'b0;
+            mon_cmd_port  <= 2'd0;
+            mon_cmd_addr  <= '0;
+        end else if (cmd_valid === 1'b1) begin
+            mon_cmd_seen  <= 1'b1;
+            mon_cmd_is_wr <= cmd_is_write;
+            mon_cmd_port  <= cmd_port_id;
+            mon_cmd_addr  <= cmd_addr;
+        end
+    end
+
     // Clock generation
     initial begin
         user_clk = 0;
@@ -119,6 +309,8 @@ module tb_ddr5_ui_top();
             s_axi_rready[i] = 1;
         end
         cmd_ready = 1;
+        wr_data_ready = 1;
+        addr_map_mode = 2'b00;
     end
 
     // Test variables
@@ -174,30 +366,31 @@ module tb_ddr5_ui_top();
         $display("\n--- Test 1: Port 0 single write ---");
         test_num = 1;
         port0_write(34'h1000, 8'h00);
-        if (cmd_valid && cmd_is_write && cmd_port_id === 2'd0) begin
-            $display("[PASS] Test %0d: Port 0 write transaction", test_num);
+        // cmd_valid reaches the controller side through the uclk->cclk CDC FIFO
+        repeat(20) @(posedge ctrl_clk);
+        if (mon_cmd_seen && mon_cmd_is_wr && mon_cmd_port === 2'd0) begin
+            $display("[PASS] Test %0d: Port 0 write transaction (cmd addr=0x%09h)", test_num, mon_cmd_addr);
             pass_count++;
         end else begin
-            $display("[FAIL] Test %0d: Port 0 write failed", test_num);
+            $display("[FAIL] Test %0d: Port 0 write failed (seen=%0b is_wr=%0b port=%0d)",
+                     test_num, mon_cmd_seen, mon_cmd_is_wr, mon_cmd_port);
             fail_count++;
         end
 
         // ==== Test 2: Address mapping check ====
         $display("\n--- Test 2: Address mapping ---");
         test_num = 2;
-        @(posedge user_clk);
-        s_axi_awaddr[0] = 34'hABCD_1234;
-        @(posedge user_clk);
-        #1;
-        // Check if address is properly mapped (combinational)
-        if (ddr5_row !== 'x && ddr5_bg !== 'x && ddr5_ba !== 'x && ddr5_col !== 'x) begin
+        port0_write(34'hABCD_1234, 8'h00);
+        repeat(5) @(posedge user_clk);
+        // Check the decoder inside the DUT follows the arbitrated address
+        if (dut.map_row !== 'x && dut.map_bg !== 'x && dut.map_ba !== 'x && dut.map_col !== 'x) begin
             $display("[PASS] Test %0d: Address mapping active", test_num);
             $display("  Row=0x%05h BG=%0d BA=%0d Col=0x%03h Rank=%0d",
-                     ddr5_row, ddr5_bg, ddr5_ba, ddr5_col, ddr5_rank);
+                     dut.map_row, dut.map_bg, dut.map_ba, dut.map_col, dut.map_rank);
             pass_count++;
         end else begin
-            $display("[PASS] Test %0d: Address mapping (no DUT instantiated)", test_num);
-            pass_count++;
+            $display("[FAIL] Test %0d: Address mapping produced X", test_num);
+            fail_count++;
         end
 
         // ==== Test 3: Multi-port arbitration ====

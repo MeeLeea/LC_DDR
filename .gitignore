@@ -1,0 +1,23 @@
+# ---- Vivado / Xsim build artifacts ----
+/xsim.dir/
+/cov_db/
+/reports/
+/.Xil/
+/xsim.covdb/
+*.log
+*.jou
+*.pb
+*.vcd
+*.wdb
+*.ucdb
+
+/.omo/
+/dfx_runtime.txt
+
+# ---- Vivado project mode (if a project is created locally) ----
+*.xpr
+*.xpr.dir/
+/.gen/
+/.runs/
+/.srcs/
+/.sim/

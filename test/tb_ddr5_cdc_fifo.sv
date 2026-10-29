@@ -46,6 +46,25 @@ module tb_ddr5_cdc_fifo();
         .rd_empty(rd_empty)
     );
 
+    // Functional coverage collector (test/ddr5_covergroups.sv), driven hierarchically
+    ddr5_coverage_collector u_cov ();
+
+    function automatic logic [ADDR_W:0] gray2bin_cov(input logic [ADDR_W:0] g);
+        logic [ADDR_W:0] b;
+        integer gi;
+        b[ADDR_W] = g[ADDR_W];
+        for (gi = ADDR_W-1; gi >= 0; gi = gi - 1) begin
+            b[gi] = b[gi+1] ^ g[gi];
+        end
+        return b;
+    endfunction
+
+    assign u_cov.wr_clk   = wr_clk;
+    assign u_cov.clk      = wr_clk;
+    assign u_cov.wr_count = dut.wr_ptr_bin[ADDR_W:0]
+                          - gray2bin_cov(dut.rd_ptr_gray_sync_wr[ADDR_W:0]);
+    assign u_cov.wr_full  = wr_full;
+
     // Clock generation (different frequencies for CDC test)
     initial begin
         wr_clk = 0;

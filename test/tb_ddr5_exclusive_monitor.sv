@@ -36,6 +36,13 @@ module tb_ddr5_exclusive_monitor();
         .snoop_hit(snoop_hit)
     );
 
+    // Functional coverage collector (test/ddr5_covergroups.sv), driven hierarchically
+    ddr5_coverage_collector u_cov ();
+    assign u_cov.clk       = clk;
+    assign u_cov.awlock    = awlock;
+    assign u_cov.arlock    = arlock;
+    assign u_cov.res_valid = res_valid;
+
     initial forever #(CLK_PERIOD/2) clk = ~clk;
 
     int pass_cnt = 0, fail_cnt = 0;

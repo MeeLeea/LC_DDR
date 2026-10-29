@@ -134,6 +134,12 @@ module ddr5_dll_ctrl #(
                         delay_code <= delay_code + 1;
                     end
 
+                    // A phase error while tracking invalidates the accumulated
+                    // stability count: re-lock requires 100 clean cycles again
+                    if (phase_error) begin
+                        lock_cnt <= '0;
+                    end
+
                     if (dll_reset || !dll_en) begin
                         state      <= DLL_IDLE;
                         dll_locked <= 1'b0;

@@ -60,6 +60,12 @@ module tb_ddr5_gearbox();
         .rd_user_ready(rd_user_ready)
     );
 
+    // Functional coverage collector (test/ddr5_covergroups.sv), driven hierarchically
+    ddr5_coverage_collector u_cov ();
+    assign u_cov.clk      = clk;
+    assign u_cov.gb_valid = wr_dfi_valid;
+    assign u_cov.gb_phase = dut.wr_phase;
+
     initial forever #(CLK_PERIOD/2) clk = ~clk;
 
     int pass_cnt = 0, fail_cnt = 0;

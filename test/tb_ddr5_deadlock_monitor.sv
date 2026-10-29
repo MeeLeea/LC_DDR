@@ -34,6 +34,16 @@ module tb_ddr5_deadlock_monitor();
         .force_refresh(force_refresh), .stall_count(stall_count)
     );
 
+    // Functional coverage collector (test/ddr5_covergroups.sv), driven hierarchically
+    ddr5_coverage_collector u_cov ();
+    assign u_cov.clk               = clk;
+    assign u_cov.cmd_in_valid      = cmd_in_valid;
+    assign u_cov.cmd_in_ready      = cmd_in_ready;
+    assign u_cov.ref_req           = ref_req;
+    assign u_cov.ref_ack           = ref_ack;
+    assign u_cov.deadlock_detected = deadlock_detected;
+    assign u_cov.stall_count       = stall_count;
+
     initial forever #(CLK_PERIOD/2) clk = ~clk;
 
     int pass_cnt = 0, fail_cnt = 0;

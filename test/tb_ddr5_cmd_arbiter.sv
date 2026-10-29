@@ -64,6 +64,13 @@ module tb_ddr5_cmd_arbiter();
         .out_qos(out_qos)
     );
 
+    // Functional coverage collector (test/ddr5_covergroups.sv), driven hierarchically
+    ddr5_coverage_collector u_cov ();
+    assign u_cov.clk          = clk;
+    assign u_cov.out_port_id  = out_port_id;
+    assign u_cov.out_is_write = out_is_write;
+    assign u_cov.out_qos      = out_qos;
+
     // Clock generation
     initial begin
         clk = 0;

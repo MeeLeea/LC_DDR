@@ -38,13 +38,17 @@ module tb_ddr5_bank_manager();
     int test_num = 0, pass_count = 0, fail_count = 0;
 
     task automatic issue_cmd(logic [3:0] type_, logic [4:0] bank_, logic [ROW_W-1:0] row_);
-        @(posedge clk);
-        cmd_valid <= 1'b1;
-        cmd_type  <= type_;
-        cmd_bank  <= bank_;
-        cmd_row   <= row_;
-        @(posedge clk);
-        cmd_valid <= 1'b0;
+        // Drive between clock edges so there is no race with the DUT, then keep
+        // cmd_valid asserted until the next command: page_hit/miss/conflict and
+        // bank_ready are combinational functions of (cmd_valid, cmd_type,
+        // cmd_bank, cmd_row), so the checks that follow sample a valid command.
+        @(negedge clk);
+        cmd_valid = 1'b1;
+        cmd_type  = type_;
+        cmd_bank  = bank_;
+        cmd_row   = row_;
+        @(posedge clk);   // command is consumed here
+        #1;               // sampling window for the combinational status
     endtask
 
     // Sample combinational outputs during the cmd_valid=1 cycle (after NBA settles)
